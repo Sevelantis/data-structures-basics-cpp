@@ -1,5 +1,4 @@
 #include <iostream>
-#include <cstring>
 #include <chrono>
 #include<cmath>
 #include <bitset>
@@ -13,13 +12,14 @@ using namespace std;
 //variable
 //time
     __int64 clock_frequency = 0;
-    double time_stamp_0 = .0;
+    chrono::high_resolution_clock::time_point start_time;
+    chrono::high_resolution_clock::time_point stop_time;
 
-const char *data_file[9] = {"data0.txt","data1.txt","data2.txt","data3.txt",
-                            "data4.txt","data5.txt","data6.txt","data7.txt",
-                            "data9.txt"};
-const int   data_size[9] = {64,1000,2000,5000,10000,15000,20000,50000,100000};
 
+const char *data_file[6] = {"data0.txt","data1.txt","data2.txt","data3.txt",
+                            "data4.txt","data5.txt"};
+const int   data_size[6] = {100,1000,2500,5000,10000,25000};
+const int minv = 0, maxv = 100000;
 //functions declarations
 void display_menu_table(class Tab&);
 void display_menu_list(class List&);
@@ -36,12 +36,12 @@ unsigned get_seed()
 int get_rand_int(int min, int max)
 {
     if(min==max) return max;
-    if((min<0   && max<0) || (min>0 &&   max>0))//jezeli min i max sa tych samych znakow
+    if((min<0   && max<0) || (min>0 &&   max>0))//if min and max are same signs
         if(min  < 0)
-            return rand() % (min-max) + min;//ujemne
+            return rand() % (min-max) + min;//negative
         else
-            return rand() % (max-min) + min;//dodatnie
-    else return rand() % (abs(max)+abs(min)) + min;//jezeli sa roznych znakow
+            return rand() % (max-min) + min;//positive
+    else return rand() % (abs(max)+abs(min)) + min;//if different signs
 }
 //creates file with random data
 void create_rand_data_file(const char* filename, int len)
@@ -50,14 +50,11 @@ void create_rand_data_file(const char* filename, int len)
     f.open(filename);
     if(f.is_open())
     {
-        for (int i = 0; i < len+1; i++) {
-            if(i != 0)
-            {
-                f << get_rand_int(-100,100);
-                if(i==len) continue;
-            }
-            else //first vbalue is length
-                f << len;
+        f << len;
+        f << endl;
+        for (int i = 0; i < len; i++) {
+            f << get_rand_int(minv,maxv);
+            if(i==len-1) continue;
             f << endl;
         }
     }else
@@ -95,20 +92,12 @@ void diff_files(const char* filename1, const char* filename2)
 //---------------------------------------TIMER FUNCTIONS-----------------------------------------------------
 void startTimer()
 {
-    LARGE_INTEGER li;
-    if (!QueryPerformanceFrequency(&li))
-        cout << "B³¹d!\n";
-
-    clock_frequency = double(li.QuadPart) / 1000.0;
-
-    QueryPerformanceCounter(&li);
-    time_stamp_0 = li.QuadPart;
+    start_time = chrono::high_resolution_clock::now();
 }
-void stopTimer()
+long stopTimer()
 {
-    LARGE_INTEGER li;
-    QueryPerformanceCounter(&li);
-    cout << "\nOperacja zajela: " << (li.QuadPart - time_stamp_0) / clock_frequency << " milisekund" << endl;
+    stop_time = chrono::high_resolution_clock::now();
+    return chrono::duration_cast<chrono::nanoseconds>(stop_time-start_time).count();
 }
 
 //-----------------------------------------TAB---------------------------------------------------
@@ -127,8 +116,8 @@ class Tab
 {
 public:
     int length;
-private:
     int *tab;
+private:
 public:
 
     Tab()
@@ -141,16 +130,13 @@ public:
         length = 0;
         delete[]tab;
     }
-    void destroy(bool reading_file = false)
+    void destroy()
     {
-        if(reading_file)
-            return;
-        else if(length == 0) cout << "Tablica jest pusta - nie mozna zniszczyc.\n";
-        else
+    if(length>0)
         {
-            while(length>0)
-                relocate(tab,length--);
             delete[]tab;
+            length = 0;
+            tab = new int[length];
         }
     }
     void create_rand_tab(int len,int min,int max)
@@ -236,10 +222,7 @@ public:
 
     void add_as_first(int val)
     {
-        if(!tab)
-            tab = new int[length];
-        length++;
-        tab = relocate(tab,length);
+        tab = relocate(tab,++length);
 
         for (int i = length-1; i > 0; i--)
             tab[i] = tab[i-1];
@@ -460,7 +443,7 @@ public:
         f.close();
     }
     //addLast
-    void push_back(int val)
+    void push_back(int val, bool inc_len = false)
     {
         auto *tmp = new ElemList();
 
@@ -475,7 +458,8 @@ public:
             head = tmp;
         }
         tail = tmp;
-        length++;
+        if(inc_len)
+            length++;
     }
     //addFirst
     void push_front(int val) {
@@ -554,7 +538,7 @@ public:
                 head = nullptr;
                 tail = nullptr;
             }
-            else
+            else if(tail->prev)
             {
                 auto*tmp_top = tail->prev;
                 tmp_top->next = nullptr;
@@ -575,7 +559,7 @@ public:
                 tail = nullptr;
                 head = nullptr;
             }
-            else
+            else if(head->next)
             {
                 auto *tmp = head->next;
                 tmp->prev= nullptr;
@@ -590,9 +574,7 @@ public:
         if(index < 0 || index >=length)
             cout << "Nieprawidlowy indeks.\n";
         else {
-            if (length == 0)
-                cout << "Lista jest pusta - brak elementu do usuniecia\n";
-            else {
+            if(length!=0){
                 if (length == 1 && index == 0) {
                     tail = nullptr;
                     head = nullptr;
@@ -607,8 +589,11 @@ public:
                             if (index > 0 && index < length-1) {
                                 tmp_top = tmp_to_del->prev;
                                 tmp_bot = tmp_to_del->next;
-                                tmp_bot->prev = tmp_top;
-                                tmp_top->next = tmp_bot;
+                                if(tmp_bot)
+                                {
+                                    tmp_bot->prev = tmp_top;
+                                    tmp_top->next = tmp_bot;
+                                }
                             } else if (index == 0) {
                                 tmp_bot = tmp_to_del->next;
                                 head = tmp_bot;
@@ -632,8 +617,7 @@ public:
     bool search(int val)
     {
         bool found = false;
-        if(length == 0) cout << "\nElementu nie ma w liscie.\n";
-        else
+        if(length!=0)
         {
             auto *tmp = head;
             while(tmp)
@@ -706,12 +690,7 @@ public:
         delete []tab;
         tab = nullptr;
         length = 0;
-//        while(length > 0)
-//        {
-//            tab[i] = 0;
-//            change_tab_size(tab,--length);
-//            i--;
-//        }
+        tab = new int[length];
     }
     //create heap with random elements
     void create_rand_heap(int len, int min,int max)
@@ -787,9 +766,16 @@ public:
         delete[]breaks;
         breaks=nullptr;
     }
-    void print_num_of_elements()
+    void print_tab()
     {
         cout << "Kopiec - " << length << " elementow.\n";
+        if(length>0)
+        {
+            for (int i = 0; i < length; i++)
+                cout << tab[i] << " ";
+            cout << endl;
+        }
+
     }
     void print_diagram(string spaces1, string spaces2, int index)
     {
@@ -821,16 +807,14 @@ public:
     //create heap up
     void create_heap_up()
     {
-        if(length == 0 ) cout << "Kopiec jest pusty - zakonczono tworzenie w gore.\n";
-        else
+        if(length!=0)
             for(int i=0;i<length;i++)
                 fix_up(i);
     }
     //create heap down
     void create_heap_down()
     {
-        if(length == 0 ) cout << "Kopiec jest pusty - zakonczono tworzenie w dol.\n";
-        else
+        if(length!=0)
             for(int i=length/2-1;i>=0;--i)
                 fix_dn(i);
     }
@@ -890,8 +874,7 @@ public:
         //replace with last element
         //delete last element
         //fix heap in the place where the key was found
-        if(length==0) cout << "Kopiec jest pusty - brak mozliwosci usuniecia.\n";
-        else
+        if(length!=0)
         {
             int key_index = search(key);    //search key has index of deleting key
             if(key_index != -1)             //if key not found: it is set to -1
@@ -1050,17 +1033,16 @@ public:
 
         if(f.is_open())
         {
-            int counter = 0;
+            int key;
+            f >> key;
+            length = key;
+            int cc = 0;
             while(!f.eof())
             {
-                int key;
                 f >> key;
-                if(counter == 0) // first value is length
-                    length = key;
-                else if(counter-1 == length) break;
-                else
-                    insert_node(new Node(key),false);
-                counter++;
+                insert_node(new Node(key),false);
+                cc++;
+                if(cc == length) break; //dont read last line
             }
         }else
             cout << "\n\tNie ma takiego pliku.\n";
@@ -1369,18 +1351,18 @@ public:
         print_to_file(file,IN_ORDER);
         destroy();
         read_from_file(file);
-        remove(file);
+//        remove(file);
     }
     //traverse left rotation
     Node* rotate_left(Node *tmp) {
         auto*tmp_r = tmp->right;
-        if(tmp->parent)
+        if (tmp->parent)
             tmp->parent->right = tmp_r;
         tmp_r->parent = tmp->parent;
-        if(!tmp_r->parent)
+        if (!tmp_r->parent)
             root = tmp_r;
         tmp->parent = tmp_r;
-        if(tmp_r->left)
+        if (tmp_r->left)
             tmp_r->left->parent = tmp;
         tmp->right = tmp_r->left;
         tmp_r->left = tmp;
@@ -1410,17 +1392,17 @@ public:
             tmp = root;
         }
         //one more rotation
-        root = rotate_left(tmp);
+        if(tmp->right)
+            root = rotate_left(tmp);
     }
 private:
 };
 
 
 //---------------------------------------MAIN-----------------------------------------------------
-int main(/*int argc, char**argv*/) {
+int main(int argc, char**argv)
+{
     srand(time_t(get_seed()));
-    int data_mode = 1;
-    create_rand_data_file(data_file[data_mode], data_size[data_mode]);
 
     bool running = true;
     char choice;
@@ -1439,7 +1421,9 @@ int main(/*int argc, char**argv*/) {
         switch(choice)
         {
             case '1':
+                startTimer();
                 display_menu_table(*tab);
+                cout << stopTimer()/1000000.0<<"ms\n\n";
                 break;
             case '2':
                 display_menu_list(*list);
@@ -1472,16 +1456,15 @@ void display_menu_tree(Tree &tree)
     {
         cout << endl;
         cout << "--- DRZEWO BST---" << endl;
-        cout << "1.Wczytaj z pliku" << endl;
-        cout << "2.Zapisz do pliku" << endl;
-        cout << "3.Stworz losowo" << endl;
-        cout << "4.Dodaj wierzcholek" << endl;
-        cout << "5.Usun wierzcholek" << endl;
-        cout << "6.Znajdz wierzcholek" << endl;
-        cout << "7.Wyswietl" << endl;
-        cout << "8.Rownowazenie drzewa BST" << endl;
-        cout << "9.Usun drzewo" << endl;
+        cout << "1.Zbuduj z pliku" << endl;
+        cout << "2.Stworz losowo" << endl;
+        cout << "3.Dodaj wierzcholek" << endl;
+        cout << "4.Usun wierzcholek" << endl;
+        cout << "5.Znajdz wierzcholek" << endl;
+        cout << "6.Wyswietl" << endl;
+        cout << "7.Usun drzewo" << endl;
         cout << "0.Powrot do menu" << endl;
+        cout << "s.Zapisz do pliku" << endl;
         cout << "--- DRZEWO BST---" << endl;
         cout << "User choice:";
         cin >> opt;
@@ -1492,38 +1475,52 @@ void display_menu_tree(Tree &tree)
                 cin >> filename;
                 tree.destroy();
                 tree.read_from_file(filename.c_str());
+                if(tree.length>0)
+                {
+                    tree.flatten("flaten.txt");
+                    tree.create_balanced_tree();
+                }
                 tree.print_num_of_elements();
                 tree.print_diagram("   "," ",tree.get_root());
                 break;
-
-            case '2'://zapisz do pliku
-                cout <<"Podaj nazwe pliku do utworzenia: ";
-                cin >> filename;
-                tree.print_to_file(filename.c_str(),Tree::PRE_ORDER);
-                break;
-            case '3':   //stworz losowo
+            case '2':   //stworz losowo
                 cout << "Podaj dlugosc: ";
                 cin >> len;
                 tree.destroy();
-                tree.create_rand_tree(len,-1000,1000);
+                tree.create_rand_tree(len,minv,maxv);
+                if(tree.length>0)
+                {
+                    tree.flatten("flaten.txt");
+                    tree.create_balanced_tree();
+                }
                 tree.print_num_of_elements();
                 tree.print_diagram("   "," ",tree.get_root());
                 break;
-            case '4'://dodaj wierzcholek
+            case '3'://dodaj wierzcholek
                 cout <<"Podaj wartosc: ";
                 cin >> val;
                 tree.insert_node(new Node(val),true);
+                if(tree.length>0)
+                {
+                    tree.flatten("flaten.txt");
+                    tree.create_balanced_tree();
+                }
                 tree.print_num_of_elements();
                 tree.print_diagram("   "," ",tree.get_root());
                 break;
-            case '5'://usun wierzcholek
+            case '4'://usun wierzcholek
                 cout <<"Podaj wartosc: ";
                 cin >> val;
                 tree.delete_node(tree.get_root(), val ,true);
+                if(tree.length>0)
+                {
+                    tree.flatten("flaten.txt");
+                    tree.create_balanced_tree();
+                }
                 tree.print_num_of_elements();
                 tree.print_diagram("   "," ",tree.get_root());
                 break;
-            case '6'://znajdz element
+            case '5'://znajdz element
                 cout << "Podaj wartosc: ";
                 cin >> val;
                 tree.print_num_of_elements();
@@ -1533,28 +1530,22 @@ void display_menu_tree(Tree &tree)
                 else
                     cout << "Elementu nie ma w liscie.\n";
                 break;
-            case '7'://wyswietl
+            case '6'://wyswietl
                 tree.print_num_of_elements();
                 tree.print_diagram("   "," ",tree.get_root());
                 break;
-            case '8'://rowzowazenie dzrewa
-                if(tree.length>0)
-                {
-                    tree.flatten("flaten.txt");
-                    tree.create_balanced_tree();
-                    tree.print_num_of_elements();
-                    tree.print_diagram("   "," ",tree.get_root());
-                }
-                else
-                    tree.print_num_of_elements();
-                break;
-            case '9'://usun drzewo
+            case '7'://usun drzewo
                 tree.destroy();
                 tree.print_num_of_elements();
                 tree.print_diagram("   "," ",tree.get_root());
                 break;
             case '0':
                 running = false;
+                break;
+            case 's'://zapisz do pliku
+                cout <<"Podaj nazwe pliku do utworzenia: ";
+                cin >> filename;
+                tree.print_to_file(filename.c_str(),Tree::PRE_ORDER);
                 break;
             default:
                 break;
@@ -1572,15 +1563,15 @@ void display_menu_heap(Heap &heap)
     {
         cout << endl;
         cout << "--- KOPIEC ---" << endl;
-        cout << "1.Wczytaj z pliku i napraw kopiec" << endl;
-        cout << "2.Zapisz do pliku" << endl;
-        cout << "3.Stworz losowo i napraw kopiec" << endl;
-        cout << "4.Dodaj klucz" << endl;
-        cout << "5.Usun klucz" << endl;
-        cout << "6.Znajdz klucz" << endl;
-        cout << "7.Wyswietl" << endl;
-        cout << "8.Usun kopiec" << endl;
+        cout << "1.Zbuduj z pliku" << endl;
+        cout << "2.Stworz losowo" << endl;
+        cout << "3.Dodaj klucz" << endl;
+        cout << "4.Usun klucz" << endl;
+        cout << "5.Znajdz klucz" << endl;
+        cout << "6.Wyswietl" << endl;
+        cout << "7.Usun kopiec" << endl;
         cout << "0.Powrot do menu" << endl;
+        cout << "s.Zapisz do pliku" << endl;
         cout << "--- KOPIEC ---" << endl;
         cout << "User choice:";
         cin >> opt;
@@ -1592,60 +1583,59 @@ void display_menu_heap(Heap &heap)
                 heap.destroy();
                 heap.read_from_file(filename.c_str());
                 heap.create_heap_up();
-                heap.print_num_of_elements();
+                heap.print_tab();
                 heap.print_diagram("   "," ",0);
                 break;
-
-            case '2'://zapisz do pliku
-                cout <<"Podaj nazwe pliku do utworzenia: ";
-                cin >> filename;
-                heap.print_to_file(filename.c_str());
-                break;
-            case '3':   //stworz losowo
+            case '2':   //stworz losowo
                 cout << "Podaj dlugosc: ";
                 cin >> len;
                 heap.destroy();
-                heap.create_rand_heap(len,-1000,1000);
+                heap.create_rand_heap(len,minv,maxv);
                 heap.create_heap_up();
-                heap.print_num_of_elements();
+                heap.print_tab();
                 heap.print_diagram("   "," ",0);
                 break;
-            case '4'://dodaj klucz
+            case '3'://dodaj klucz
                 cout <<"Podaj wartosc: ";
                 cin >> val;
                 heap.insert_key(val);
-                heap.print_num_of_elements();
-                heap.print_num_of_elements();
+                heap.print_tab();
+                heap.print_tab();
                 heap.print_diagram("   "," ",0);
                 break;
-            case '5'://usun klucz
+            case '4'://usun klucz
                 cout <<"Podaj wartosc: ";
                 cin >> val;
                 heap.delete_key(val);
-                heap.print_num_of_elements();
+                heap.print_tab();
                 heap.print_diagram("   "," ",0);
                 break;
-            case '6'://znajdz element
+            case '5'://znajdz element
                 cout << "Podaj wartosc: ";
                 cin >> val;
-                heap.print_num_of_elements();
+                heap.print_tab();
                 heap.print_diagram("   "," ",0);
                 if(heap.search(val) != -1)
                     cout << "Element jest w liscie.\n";
                 else
                     cout << "Elementu nie ma w liscie.\n";
                 break;
-            case '7'://wyswietl
-                heap.print_num_of_elements();
+            case '6'://wyswietl
+                heap.print_tab();
                 heap.print_diagram("   "," ",0);
                 break;
-            case '8'://usun kopiec
+            case '7'://usun kopiec
                 heap.destroy();
-                heap.print_num_of_elements();
+                heap.print_tab();
                 heap.print_diagram("   "," ",0);
                 break;
             case '0':
                 running = false;
+                break;
+            case 's'://zapisz do pliku
+                cout <<"Podaj nazwe pliku do utworzenia: ";
+                cin >> filename;
+                heap.print_to_file(filename.c_str());
                 break;
             default:
                 break;
@@ -1662,19 +1652,15 @@ void display_menu_list(List &list)
     {
         cout << endl;
         cout << "--- LISTA ---" << endl;
-        cout << "1.Wczytaj z pliku" << endl;
-        cout << "2.Zapisz do pliku" << endl;
-        cout << "3.Stworz losowa liste" << endl;
-        cout << "4.Dodaj element na poczatku" << endl;
-        cout << "5.Dodaj element na koncu" << endl;
-        cout << "6.Dodaj element na pozycje" << endl;
-        cout << "7.Usun element na poczatku" << endl;
-        cout << "8.Usun element na koncu" << endl;
-        cout << "9.Usun element z pozycji" << endl;
-        cout << "a.Znajdz element" << endl;
-        cout << "b.Wyswietl" << endl;
-        cout << "c.Usun liste" << endl;
+        cout << "1.Zbuduj z pliku" << endl;
+        cout << "2.Stworz losowa liste" << endl;
+        cout << "3.Dodaj element na pozycje" << endl;
+        cout << "4.Usun element z pozycji" << endl;
+        cout << "5.Znajdz element" << endl;
+        cout << "6.Wyswietl" << endl;
+        cout << "7.Usun liste" << endl;
         cout << "0.Powrot do menu" << endl;
+        cout << "s.Zapisz do pliku" << endl;
         cout << "--- LISTA ---" << endl;
         cout << "User choice:";
         cin >> opt;
@@ -1687,32 +1673,14 @@ void display_menu_list(List &list)
                 list.read_from_file(filename.c_str());
                 list.print_to_console();
                 break;
-
-            case '2'://zapisz do pliku
-                cout <<"Podaj nazwe pliku do utworzenia: ";
-                cin >> filename;
-                list.print_to_file(filename.c_str());
-                break;
-            case '3':   //stworz losowa tablice
+            case '2':   //stworz losowa tablice
                 cout << "Podaj dlugosc: ";
                 cin >> len;
                 list.destroy();
-                list.create_rand_list(len,-1000,1000);
+                list.create_rand_list(len,minv,maxv);
                 list.print_to_console();
                 break;
-            case '4'://dodaj element na poczatku
-                cout <<"Podaj wartosc: ";
-                cin >> val;
-                list.push_front(val);
-                list.print_to_console();
-                break;
-            case '5'://dodaj element na koncu
-                cout <<"Podaj wartosc: ";
-                cin >> val;
-                list.push_back(val);
-                list.print_to_console();
-                break;
-            case '6'://dodaj element na pozycje
+            case '3'://dodaj element na pozycje
                 cout <<"Podaj indeks: ";
                 cin >> index;
                 cout <<"Podaj wartosc: ";
@@ -1720,21 +1688,13 @@ void display_menu_list(List &list)
                 list.push_at(index, val);
                 list.print_to_console();
                 break;
-            case '7'://usun element na poczatku
-                list.pop_front();
-                list.print_to_console();
-                break;
-            case '8'://usun element na koncu
-                list.pop_back();
-                list.print_to_console();
-                break;
-            case '9'://usun element na pozycji
+            case '4'://usun element na pozycji
                 cout <<"Podaj indeks: ";
                 cin>> index;
                 list.pop_at(index);
                 list.print_to_console();
                 break;
-            case 'a'://znajdz element
+            case '5'://znajdz element
                 cout << "Podaj wartosc: ";
                 cin >> val;
                 list.print_to_console();
@@ -1743,14 +1703,17 @@ void display_menu_list(List &list)
                 else
                     cout << "Elementu nie ma w liscie.\n";
                 break;
-            case 'b'://wyswietl
+            case '6'://wyswietl
                 list.print_to_console();
                 break;
-            case 'c'://usun tablice
+            case '7'://usun tablice
                 list.destroy();
                 list.print_to_console();
                 break;
-            case 'd':
+            case 's'://zapisz do pliku
+                cout <<"Podaj nazwe pliku do utworzenia: ";
+                cin >> filename;
+                list.print_to_file(filename.c_str());
                 break;
             case '0':
                 running = false;
@@ -1771,19 +1734,15 @@ void display_menu_table(Tab &tab)
     {
         cout << endl;
         cout << "--- TABLICA ---" << endl;
-        cout << "1.Wczytaj z pliku" << endl;
-        cout << "2.Zapisz do pliku" << endl;
-        cout << "3.Stworz losowa tablice" << endl;
-        cout << "4.Dodaj element na poczatku" << endl;
-        cout << "5.Dodaj element na koncu" << endl;
-        cout << "6.Dodaj element na pozycje" << endl;
-        cout << "7.Usun element na poczatku" << endl;
-        cout << "8.Usun element na koncu" << endl;
-        cout << "9.Usun element z pozycji" << endl;
-        cout << "a.Znajdz element" << endl;
-        cout << "b.Wyswietl" << endl;
-        cout << "c.Usun tablice" << endl;
+        cout << "1.Zbuduj z pliku" << endl;
+        cout << "2.Stworz losowa tablice" << endl;
+        cout << "3.Dodaj element na pozycje" << endl;
+        cout << "4.Usun element z pozycji" << endl;
+        cout << "5.Znajdz element" << endl;
+        cout << "6.Wyswietl" << endl;
+        cout << "7.Usun tablice" << endl;
         cout << "0.Powrot do menu" << endl;
+        cout << "s.Zapisz do pliku" << endl;
         cout << "--- TABLICA ---" << endl;
         cout << "User choice:";
         cin >> opt;
@@ -1791,36 +1750,18 @@ void display_menu_table(Tab &tab)
             case '1': //wczytaj z pliku
                 cout << "Podaj nazwe zbioru do wczytania: ";
                 cin >> filename;
-                tab.destroy(true);
+                tab.destroy();
                 tab.read_from_file(filename.c_str());
                 tab.print_to_console();
                 break;
-
-            case '2'://zapisz do pliku
-                cout <<"Podaj nazwe pliku do utworzenia: ";
-                cin >> filename;
-                tab.print_to_file(filename.c_str());
-                break;
-            case '3':   //stworz losowa tablice
+            case '2':   //stworz losowa tablice
                 cout << "Podaj dlugosc: ";
                 cin >> len;
-                tab.destroy(true);
-                tab.create_rand_tab(len,-1000,1000);
+                tab.destroy();
+                tab.create_rand_tab(len,minv,maxv);
                 tab.print_to_console();
                 break;
-            case '4'://dodaj element na poczatku
-                cout <<"Podaj wartosc: ";
-                cin >> val;
-                tab.add_as_first(val);
-                tab.print_to_console();
-                break;
-            case '5'://dodaj element na koncu
-                cout <<"Podaj wartosc: ";
-                cin >> val;
-                tab.add_as_last(val);
-                tab.print_to_console();
-                break;
-            case '6'://dodaj element na pozycje
+            case '3'://dodaj element na pozycje
                 cout <<"Podaj indeks: ";
                 cin >> index;
                 cout <<"Podaj wartosc: ";
@@ -1828,21 +1769,13 @@ void display_menu_table(Tab &tab)
                 tab.insert_at(index,val);
                 tab.print_to_console();
                 break;
-            case '7'://usun element na poczatku
-                tab.delete_first();
-                tab.print_to_console();
-                break;
-            case '8'://usun element na koncu
-                tab.delete_last();
-                tab.print_to_console();
-                break;
-            case '9'://usun element na pozycji
+            case '4'://usun element na pozycji
                 cout <<"Podaj indeks: ";
                 cin>> index;
                 tab.delete_at(index);
                 tab.print_to_console();
                 break;
-            case 'a'://znajdz element
+            case '5'://znajdz element
                 cout << "Podaj wartosc: ";
                 cin >> val;
                 tab.print_to_console();
@@ -1851,21 +1784,23 @@ void display_menu_table(Tab &tab)
                 else
                     cout <<"Elementu nie ma w tablicy.\n";
                 break;
-            case 'b'://wyswietl
+            case '6'://wyswietl
                 tab.print_to_console();
                 break;
-            case 'c'://usun tablice
+            case '7'://usun tablice
                 tab.destroy();
                 tab.print_to_console();
-                break;
-            case 'd':
                 break;
             case '0':
                 running = false;
                 break;
+            case 's'://zapisz do pliku
+                cout <<"Podaj nazwe pliku do utworzenia: ";
+                cin >> filename;
+                tab.print_to_file(filename.c_str());
+                break;
             default:
                 break;
         }
-
     }
 }
