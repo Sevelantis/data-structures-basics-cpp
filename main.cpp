@@ -11,9 +11,9 @@ using namespace std;
 
 //variable
 //time
-    __int64 clock_frequency = 0;
-    chrono::high_resolution_clock::time_point start_time;
-    chrono::high_resolution_clock::time_point stop_time;
+__int64 clock_frequency = 0;
+chrono::high_resolution_clock::time_point start_time;
+chrono::high_resolution_clock::time_point stop_time;
 
 
 const char *data_file[6] = {"data0.txt","data1.txt","data2.txt","data3.txt",
@@ -132,7 +132,7 @@ public:
     }
     void destroy()
     {
-    if(length>0)
+        if(length>0)
         {
             delete[]tab;
             length = 0;
@@ -362,6 +362,7 @@ public:
     }
     void create_rand_list(int len, int min, int max)
     {
+        length = len;
         for (int i = 0; i < len; i++)
             push_back(get_rand_int(min, max));
     }
@@ -407,7 +408,7 @@ public:
             {
                 cout << tmp->data << " ";
                 tmp = tmp->next;
-             }
+            }
             tmp = tail;
             cout<<endl;
             //print backwards
@@ -747,7 +748,7 @@ public:
     //print heap - developer mode
     void print()
     {
-        //indeksy nowych poziomów
+        //indeksy nowych poziom?w
         cout <<endl;
         int n=22;
         int *breaks = new int[n];
@@ -847,7 +848,7 @@ public:
             new_parent = right_child;
 
         //jif parent is not root
-            //swap and fix
+        //swap and fix
         if(new_parent != parent_index)
         {
             swap(&tab[parent_index], &tab[new_parent]);
@@ -858,7 +859,7 @@ public:
     void insert_key(int key)
     {
         //insert new key at the end
-            //fix heap (if needed)
+        //fix heap (if needed)
         length++;
         if(!tab)
             tab = new int[length];
@@ -923,7 +924,7 @@ private:
         return parent_index*2+2;
     }
     //returns array with changed size - NOT USING DYNAMIC RELOCATION
-        //- deletes whole array and creates new with fixed size
+    //- deletes whole array and creates new with fixed size
     inline int* change_tab_size(int* tab , int t_len)
     {
         int* new_tab = new int[t_len];
@@ -941,13 +942,13 @@ private:
     }
 };
 //---------------------------------------BINARY SEARCH TREE-----------------------------------------------------
-    /*
-     *       STRUCTURE NODE OF BINARY TREE:
-     *       -holds 4bytes of data - integer
-     *       -stores points to: left, right and parent Nodes
-     *
-     *
-     */
+/*
+ *       STRUCTURE NODE OF BINARY TREE:
+ *       -holds 4bytes of data - integer
+ *       -stores points to: left, right and parent Nodes
+ *
+ *
+ */
 struct Node
 {
     explicit Node(int k)
@@ -979,8 +980,8 @@ public:
 
     //save to file modes
     static const int PRE_ORDER = 0,
-                IN_ORDER = 1,
-                POST_ORDER=2;
+            IN_ORDER = 1,
+            POST_ORDER=2;
 
 private:
     //tree rot
@@ -1195,7 +1196,7 @@ public:
             {
                 auto *parent = node_delete->parent;
                 //check if node is right or left son
-                    //unlink from parent
+                //unlink from parent
                 if(parent)
                 {
                     if(node_delete == parent->left)
@@ -1210,7 +1211,7 @@ public:
                     root_ = nullptr;
                 }
             }
-            //when node has both sons
+                //when node has both sons
             else if(node_delete->right && node_delete->left)
             {
                 auto *parent = node_delete->parent;
@@ -1228,7 +1229,7 @@ public:
                 delete_node(node_delete, node_to_replace->key);
                 node_delete->key = node_to_replace->key;
             }
-            //node has only ONE son
+                //node has only ONE son
             else
             {
                 auto *parent = node_delete->parent;
@@ -1351,7 +1352,7 @@ public:
         print_to_file(file,IN_ORDER);
         destroy();
         read_from_file(file);
-//        remove(file);
+        remove(file);
     }
     //traverse left rotation
     Node* rotate_left(Node *tmp) {
